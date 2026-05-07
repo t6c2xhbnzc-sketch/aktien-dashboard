@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>StockLens — Aktienanalyse</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/lightweight-charts/4.1.3/lightweight-charts.standalone.production.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -1014,12 +1014,17 @@ function renderDashboard(ticker, quote, chart, ai) {
 
 function renderChart(chartData, currency) {
   if (currentChart) {
-    currentChart.remove();
+    try { currentChart.remove(); } catch(e) {}
     currentChart = null;
   }
 
   const container = document.getElementById('chartDiv');
   container.innerHTML = '';
+
+  if (typeof LightweightCharts === 'undefined') {
+    renderCanvasChart(chartData, container);
+    return;
+  }
 
   currentChart = LightweightCharts.createChart(container, {
     width: container.clientWidth,
@@ -1309,6 +1314,74 @@ function cardHTML(c) {
       ${c.value ? `<div class="card-value">${c.value}</div>` : ''}
       <div class="card-content">${c.content || ''}</div>
     </div>`;
+}
+
+
+function renderCanvasChart(chartData, container) {
+  const timestamps = chartData.timestamp || [];
+  const closes = chartData.indicators?.quote?.[0]?.close || [];
+  const opens = chartData.indicators?.quote?.[0]?.open || [];
+
+  const data = [];
+  for (let i = 0; i < timestamps.length; i++) {
+    if (closes[i]) data.push({ t: timestamps[i], c: closes[i], o: opens[i] || closes[i] });
+  }
+  if (data.length === 0) { container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:400px;color:#4a6d8c;font-size:0.8rem;letter-spacing:2px;">KEINE CHART-DATEN</div>'; return; }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = container.clientWidth || 800;
+  canvas.height = 400;
+  container.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+
+  const prices = data.map(d => d.c);
+  const minP = Math.min(...prices) * 0.995;
+  const maxP = Math.max(...prices) * 1.005;
+  const pad = { l: 60, r: 20, t: 20, b: 40 };
+  const w = canvas.width - pad.l - pad.r;
+  const h = canvas.height - pad.t - pad.b;
+
+  ctx.fillStyle = '#0d1520';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Grid
+  ctx.strokeStyle = '#1a2d45';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.t + (h / 5) * i;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + w, y); ctx.stroke();
+    const price = maxP - ((maxP - minP) / 5) * i;
+    ctx.fillStyle = '#4a6d8c';
+    ctx.font = '11px DM Mono, monospace';
+    ctx.fillText(price.toFixed(0), 4, y + 4);
+  }
+
+  // Area fill
+  const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + h);
+  grad.addColorStop(0, 'rgba(0,212,255,0.25)');
+  grad.addColorStop(1, 'rgba(0,212,255,0)');
+  ctx.beginPath();
+  data.forEach((d, i) => {
+    const x = pad.l + (i / (data.length - 1)) * w;
+    const y = pad.t + h - ((d.c - minP) / (maxP - minP)) * h;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  const lastX = pad.l + w, lastY = pad.t + h;
+  ctx.lineTo(lastX, lastY); ctx.lineTo(pad.l, lastY);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.strokeStyle = '#00d4ff';
+  ctx.lineWidth = 2;
+  data.forEach((d, i) => {
+    const x = pad.l + (i / (data.length - 1)) * w;
+    const y = pad.t + h - ((d.c - minP) / (maxP - minP)) * h;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
 }
 
 function formatPrice(price, currency) {
