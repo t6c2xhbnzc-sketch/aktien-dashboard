@@ -5,7 +5,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>StockLens — Aktienanalyse</title>
-<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -1013,91 +1012,10 @@ function renderDashboard(ticker, quote, chart, ai) {
 }
 
 function renderChart(chartData, currency) {
-  if (currentChart) {
-    try { currentChart.remove(); } catch(e) {}
-    currentChart = null;
-  }
-
+  currentChart = null;
   const container = document.getElementById('chartDiv');
   container.innerHTML = '';
-
-  if (typeof LightweightCharts === 'undefined') {
-    renderCanvasChart(chartData, container);
-    return;
-  }
-
-  currentChart = LightweightCharts.createChart(container, {
-    width: container.clientWidth,
-    height: 400,
-    layout: {
-      background: { color: '#0d1520' },
-      textColor: '#4a6d8c',
-      fontSize: 11,
-      fontFamily: 'DM Mono'
-    },
-    grid: {
-      vertLines: { color: '#1a2d45' },
-      horzLines: { color: '#1a2d45' }
-    },
-    crosshair: {
-      mode: LightweightCharts.CrosshairMode.Normal,
-      vertLine: { color: '#00d4ff', labelBackgroundColor: '#0d1520' },
-      horzLine: { color: '#00d4ff', labelBackgroundColor: '#0d1520' }
-    },
-    rightPriceScale: { borderColor: '#1a2d45' },
-    timeScale: { borderColor: '#1a2d45', timeVisible: true }
-  });
-
-  const timestamps = chartData.timestamp || [];
-  const closes = chartData.indicators?.quote?.[0]?.close || [];
-  const opens = chartData.indicators?.quote?.[0]?.open || [];
-  const highs = chartData.indicators?.quote?.[0]?.high || [];
-  const lows = chartData.indicators?.quote?.[0]?.low || [];
-
-  // Build candlestick data
-  const candleData = [];
-  for (let i = 0; i < timestamps.length; i++) {
-    if (closes[i] && opens[i]) {
-      candleData.push({
-        time: timestamps[i],
-        open: opens[i],
-        high: highs[i] || closes[i],
-        low: lows[i] || closes[i],
-        close: closes[i]
-      });
-    }
-  }
-
-  if (candleData.length > 1) {
-    currentSeries = currentChart.addCandlestickSeries({
-      upColor: '#00e676',
-      downColor: '#ff1744',
-      borderUpColor: '#00e676',
-      borderDownColor: '#ff1744',
-      wickUpColor: '#00e676',
-      wickDownColor: '#ff1744'
-    });
-    currentSeries.setData(candleData);
-  } else {
-    // Fallback to area chart
-    const areaData = timestamps
-      .map((t, i) => closes[i] ? { time: t, value: closes[i] } : null)
-      .filter(Boolean);
-
-    currentSeries = currentChart.addAreaSeries({
-      lineColor: '#00d4ff',
-      topColor: 'rgba(0,212,255,0.3)',
-      bottomColor: 'rgba(0,212,255,0)',
-      lineWidth: 2
-    });
-    currentSeries.setData(areaData);
-  }
-
-  currentChart.timeScale().fitContent();
-
-  window.addEventListener('resize', () => {
-    if (currentChart) currentChart.applyOptions({ width: container.clientWidth });
-  });
+  renderCanvasChart(chartData, container);
 }
 
 async function changeTimeframe(tf) {
